@@ -1,0 +1,58 @@
+// Code your testbench here
+// or browse Examples
+module tb_or_coverage;
+  
+  bit a, b;
+  bit y;
+  
+  or_gate dut(.a(a),.b(b),.y(y));
+  
+  class orcoverage;
+    covergroup or_coverage;
+      option.per_instance = 1;
+      
+      input_a: coverpoint a{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_b: coverpoint b{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      comb_input: cross input_a, input_b;
+      
+      output_y: coverpoint y{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+    endgroup
+    
+    function new();
+      or_coverage = new();
+    endfunction
+    
+  endclass
+  
+  orcoverage cov = new();
+  
+  initial begin
+    for(int i=0; i<2; i++)begin
+      for(int j=0; j<2; j++)begin
+        a = i;
+        b = j;
+        #10;
+        cov.or_coverage.sample();
+      end
+    end
+    $display("covered collected : %0.2f%%", cov.or_coverage.get_coverage());
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(0, tb_or_coverage);
+  end
+  
+endmodule
