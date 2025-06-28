@@ -1,0 +1,66 @@
+// Code your testbench here
+// or browse Examples
+module tb_mux_coverage;
+  
+  bit in0, in1, sel;
+  bit mux_out;
+  
+  mux2x1 dut(.in0(in0),.in1(in1),.sel(sel),.mux_out(mux_out));
+  
+  class mux2x1_coverage;
+    covergroup mux_coverage;
+      option.per_instance = 1;
+      
+      input_in0: coverpoint in0{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_in1: coverpoint in1{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_sel: coverpoint sel{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      comb_input: cross input_in0, input_in1, input_sel;
+      
+      output_mux_out: coverpoint mux_out{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+    endgroup
+    
+    function new();
+      mux_coverage = new();
+    endfunction
+    
+  endclass
+  
+  mux2x1_coverage cov = new();
+  
+  initial begin
+    for(int i=0; i<2; i++)begin
+      for(int j=0; j<2; j++)begin
+        for(int k=0; k<2; k++)begin
+          i = sel;
+          j = in0;
+          k = in1;
+          #10;
+          cov.mux_coverage.sample();
+        end
+      end
+    end
+    $display("Coverage collected: %0.2f%%", cov.mux_coverage.get_coverage());
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(0, tb_mux_coverage);
+  end
+  
+endmodule

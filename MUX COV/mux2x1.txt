@@ -1,0 +1,9 @@
+// Code your design here
+module mux2x1(
+  input in0, in1, sel,
+  output mux_out
+);
+  
+  assign mux_out = (sel)?in1:in0;
+  
+endmodule
