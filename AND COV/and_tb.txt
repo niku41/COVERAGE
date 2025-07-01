@@ -1,0 +1,56 @@
+module and_gate_coverage; 
+  bit a, b; 
+  bit y; 
+  
+  // DUT instance 
+  and_gate dut (.a(a), .b(b), .y(y));
+
+  class andcoverage;
+    covergroup and_cov;
+      option.per_instance = 1;
+
+      input_a: coverpoint a {
+        bins low = {0}; 
+        bins high = {1}; 
+      } 
+      
+      input_b: coverpoint b { 
+        bins low = {0}; 
+        bins high = {1}; 
+      } 
+      
+      input_comb: cross input_a, input_b; 
+      
+      output_y: coverpoint y { 
+        bins low = {0}; 
+        bins high = {1}; 
+      } 
+
+    endgroup 
+
+    function new(); 
+      and_cov = new(); 
+    endfunction 
+
+  endclass 
+
+  andcoverage cov = new(); 
+
+  initial begin 
+  for (int i = 0; i < 2; i++) begin 
+    for (int j = 0; j < 2; j++) begin 
+      a = i; 
+      b = j; 
+      #10;  
+      cov.and_cov.sample(); 
+    end 
+  end 
+    $display("Coverage Collected: %0.2f%%", cov.and_cov.get_coverage());
+end 
+  
+     initial begin
+       $dumpfile("dump.vcd");
+       $dumpvars(0, and_gate_coverage); 
+     end
+
+endmodule
