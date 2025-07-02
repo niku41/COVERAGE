@@ -1,0 +1,66 @@
+// Code your testbench here
+// or browse Examples
+module tb_dff_coverage;
+  
+  bit clk,rst,d;
+  bit q;
+  
+  dff dut(.clk(clk),.rst(rst),.d(d),.q(q));
+  
+  class dff_coverage;
+    covergroup dff_cov;
+      option.per_instance = 1;
+      
+      input_d: coverpoint d{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_rst: coverpoint rst{
+        bins inactive = {0};
+        bins high = {1};
+      }
+      
+      input_clk: coverpoint clk{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      comb_inputs: cross input_d, input_rst, input_clk;
+      
+      output_q: coverpoint q{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+    endgroup
+    
+    function new();
+      dff_cov = new();
+    endfunction
+    
+  endclass
+  
+  dff_coverage cov = new();
+  
+   initial begin
+    for (int i = 0; i < 2; i++) begin
+      for (int j = 0; j < 2; j++) begin
+        for (int k = 0; k < 2; k++) begin
+          clk = k;
+          d = i;
+          rst = j;
+          #10;
+          cov.dff_cov.sample();
+        end
+      end
+    end
+    $display("Coverage collected: %0.2f%%", cov.dff_cov.get_coverage());
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(0, tb_dff_coverage);
+  end
+  
+endmodule
