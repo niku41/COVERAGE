@@ -1,0 +1,65 @@
+module tb_full_adder_coverage;
+  bit a, b, cin;
+  bit sum, cout;
+  
+  full_adder dut(.a(a), .b(b), .cin(cin), .sum(sum), .cout(cout));
+  
+  class full_adder_coverage;
+    covergroup fa_cov;
+      option.per_instance = 1;
+      
+      input_a: coverpoint a {
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_b: coverpoint b {
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_cin: coverpoint cin {
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      comb_inputs: cross input_a, input_b, input_cin;
+      
+      output_sum: coverpoint sum {
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      output_cout: coverpoint cout {
+        bins low = {0};
+        bins high = {1};
+      }
+    endgroup
+    
+    function new();
+      fa_cov = new();
+    endfunction
+  endclass
+  
+  full_adder_coverage cov = new();
+  
+  initial begin
+    for (int i = 0; i < 2; i++) begin
+      for (int j = 0; j < 2; j++) begin
+        for (int k = 0; k < 2; k++) begin
+          a = i;
+          b = j;
+          cin = k;
+          #10;
+          cov.fa_cov.sample();
+        end
+      end
+    end
+    $display("Coverage collected: %0.2f%%", cov.fa_cov.get_coverage());
+  end
+  
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(0, tb_full_adder_coverage);
+  end
+endmodule
