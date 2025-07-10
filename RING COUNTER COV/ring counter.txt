@@ -1,0 +1,87 @@
+`timescale 1ns/1ps
+
+// DUT: Ring Counter
+module ring_counter (
+    input  logic clk,
+    input  logic rst,
+    output logic [3:0] out
+);
+    always_ff @(posedge clk or posedge rst) begin
+        if (rst)
+            out <= 4'b0001;
+        else begin
+            out[3] <= out[2];
+            out[2] <= out[1];
+            out[1] <= out[0];
+            out[0] <= out[3];
+        end
+    end
+endmodule
+
+// Coverage Class
+class ring_counter_coverage;
+
+    logic [3:0] out_val;
+
+    covergroup cg_ring;
+        coverpoint out_val {
+            bins b0001 = {4'b0001};
+            bins b0010 = {4'b0010};
+            bins b0100 = {4'b0100};
+            bins b1000 = {4'b1000};
+        }
+    endgroup
+
+    function new();
+        cg_ring = new();  // ✅ Define after covergroup
+    endfunction
+
+    function void sample(logic [3:0] val);
+        out_val = val;
+        cg_ring.sample();
+    endfunction
+
+    function real get_cov();
+        return cg_ring.get_inst_coverage();  // ✅ Correct name
+    endfunction
+
+endclass
+
+// Testbench
+module tb;
+
+    logic clk = 0;
+    logic rst;
+    logic [3:0] out;
+
+    ring_counter dut (.clk(clk), .rst(rst), .out(out));
+
+    ring_counter_coverage cov;
+    int i;
+    real cov_percent;
+
+    // Clock
+    always #5 clk = ~clk;
+
+    initial begin
+        $dumpfile("dump.vcd");
+        $dumpvars(0, tb);
+
+        $display("Starting ring counter test...");
+        cov = new();
+
+        rst = 1; #10;
+        rst = 0;
+
+        for (i = 0; i < 20; i++) begin
+            @(posedge clk);
+            cov.sample(out);
+            $display("Cycle %0d: out = %b", i, out);
+        end
+
+        cov_percent = cov.get_cov();  // ✅ Use correct method
+        $display("\nFunctional Coverage = %0.2f%%", cov_percent);
+
+        $finish;
+    end
+endmodule
