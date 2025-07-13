@@ -1,0 +1,108 @@
+module priority_encoder_4x2 (
+  input  [3:0] in,
+  output reg [1:0] out,
+  output reg       valid
+);
+
+always @(*) begin
+  casex (in)
+    4'b1xxx: begin out = 2'b11; valid = 1'b1; end  
+    4'b01xx: begin out = 2'b10; valid = 1'b1; end  
+    4'b001x: begin out = 2'b01; valid = 1'b1; end  
+    4'b0001: begin out = 2'b00; valid = 1'b1; end  
+    default: begin out = 2'b00; valid = 1'b0; end  
+  endcase
+end
+
+endmodule
+
+module p_encoder_tb();
+
+  logic [3:0] in;
+  logic       valid;
+  logic [1:0] out;
+
+  priority_encoder_4x2 inst (
+    .in(in),
+    .out(out),
+    .valid(valid)
+  );
+
+  class priority_encoder_coverage;
+    bit [3:0] in_sample;
+    bit [1:0] out_sample;
+    bit       valid_sample;
+
+    covergroup p_encoder_coverage;
+      option.per_instance = 1;
+
+      cp_out: coverpoint out_sample {
+        bins val0 = {0}; 
+        bins val1 = {1}; 
+        bins val2 = {2}; 
+        bins val3 = {3}; 
+      }
+
+      cp_in: coverpoint in_sample {
+        bins b0 = {4'b0000}; 
+        bins b1 = {4'b0001}; 
+        bins b2 = {4'b0010, 4'b0011}; 
+        bins b3 = {4'b0100, 4'b0110, 4'b0101, 4'b0111}; 
+        bins b4 = default;  
+      }
+
+      cp_valid: coverpoint valid_sample {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      cross cp_out, cp_in {
+        ignore_bins illegal_0 = binsof(cp_out) intersect {3} &&
+                                binsof(cp_in) intersect {4'b0001, 4'b0010};
+
+        ignore_bins illegal_1 = binsof(cp_out) intersect {2} &&
+                                binsof(cp_in) intersect {4'b0001};
+      }
+
+    endgroup
+
+    function new();
+      p_encoder_coverage = new();
+    endfunction
+
+    task sample(bit [3:0] in_v, bit [1:0] out_v, bit valid_v);
+      in_sample    = in_v;
+      out_sample   = out_v;
+      valid_sample = valid_v;
+      p_encoder_coverage.sample();
+    endtask
+
+  endclass
+
+  priority_encoder_coverage cov = new();
+
+  initial begin
+    logic [3:0] test_vectors[] = {
+      4'b0000, 4'b0001, 4'b0010, 4'b0100, 4'b1000,
+      4'b0011, 4'b0110, 4'b1110, 4'b1111,
+      4'b1010, 4'b1100, 4'b0101, 4'b0111,
+      4'b1001, 4'b1101
+    };
+
+    foreach (test_vectors[i]) begin
+      in = test_vectors[i];
+      #5;
+      cov.sample(in, out, valid); 
+      #5;
+    end
+
+    $display("Functional coverage : %0.2f%%", cov.p_encoder_coverage.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("dump.vcd");
+    $dumpvars(0, p_encoder_tb);
+  end
+
+endmodule
