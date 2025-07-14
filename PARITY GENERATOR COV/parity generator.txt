@@ -1,0 +1,80 @@
+module parity_generator(
+  input [7:0] data_in,
+  output parity_bit
+);
+  
+  assign parity_bit = ^data_in;
+  
+endmodule
+
+module parity_gen_tb;
+  logic [7:0] data_in;
+  bit parity_bit;
+  
+  parity_generator inst(.data_in(data_in),.parity_bit(parity_bit));
+  
+  class parity_gen_cov;
+    
+    function int hamming_weight(bit [7:0] val);
+      int count = 0;
+      for(int i = 0; i < 8; i++)
+        if(val[i])count ++;
+      return count;
+      endfunction
+    
+    covergroup parity_cov;
+      option.per_instance = 1;
+      
+      output_parity_bit: coverpoint parity_bit{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_data_in: coverpoint data_in{
+        bins all_vals[] = {[0:255]};
+      }
+      
+      cp_num_ones: coverpoint hamming_weight(data_in){
+        bins num0 = {0};
+        bins num1 = {1};
+        bins num2 = {2};
+        bins num3 = {3};
+        bins num4 = {4};
+        bins num5 = {5};
+        bins num6 = {6};
+        bins num7 = {7};
+        bins num8 = {8};
+      }
+      
+      cross_num_ones_parity: cross cp_num_ones, input_data_in {
+        ignore_bins invalid = binsof(cp_num_ones) intersect {0,2,4,6,8} && binsof(input_data_in) intersect {1}; 
+        ignore_bins invalid2 = binsof(cp_num_ones) intersect {1,3,5,7} && binsof(input_data_in) intersect {0}; 
+}
+      
+    endgroup
+    
+    function new();
+      parity_cov = new();
+    endfunction
+    
+  endclass
+  
+  parity_gen_cov cov = new();
+  
+  initial begin
+    for (int i = 0; i < 256; i++) begin
+  data_in = i;
+  #1;
+  cov.parity_cov.sample();
+end
+    
+    $display("functional coverage:%0.2f%%", cov.parity_cov.get_coverage());
+    $finish;
+  end
+  
+  initial begin
+    $dumpfile("parity.vcd");
+    $dumpvars(0,parity_gen_tb);
+  end
+  
+endmodule
