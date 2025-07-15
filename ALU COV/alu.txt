@@ -1,0 +1,89 @@
+module alu_4ops(
+  input logic[3:0]a, b,
+  input logic[1:0] sel,
+  output logic[3:0] result,
+  output logic zero_flag
+);
+  
+  always_comb begin
+    case(sel)
+      2'b00:result = a + b;
+      2'b01:result = a - b;
+      2'b10:result = a & b;
+      2'b11: result = a | b;
+      default: result = 4'b0000;
+    endcase
+  end
+    
+  assign zero_flag = (result == 4'b0000);
+  
+endmodule
+
+
+module alu_tb;
+  logic [3:0] a, b;
+  logic [1:0] sel;
+  bit zero_flag;
+  logic [3:0] result;
+  
+  alu_4ops inst(.a(a),.b(b),.sel(sel),.zero_flag(zero_flag),.result(result));
+  
+  class alu_coverage;
+    covergroup alu_cov;
+      option.per_instance = 1;
+      
+      input_sel: coverpoint sel{
+        bins add = {2'b00};
+        bins sub = {2'b01};
+        bins and_op = {2'b10};
+        bins or_op = {2'b11};
+      }
+      
+      input_zero_flag: coverpoint zero_flag{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      output_result: coverpoint result{
+        bins result_val[] = {[15:0]};
+      }
+      
+      cross_op : cross input_sel, input_zero_flag;
+      
+    endgroup
+    
+    function new();
+      alu_cov = new();
+    endfunction
+    
+  endclass
+  
+  alu_coverage cov = new();
+  
+  initial begin
+    logic [3:0] a_vec[] = '{4, 5, 8, 15, 0};
+    logic [3:0] b_vec[] = '{4, 1, 8, 0, 15};
+
+    foreach (a_vec[i]) begin
+      foreach (b_vec[j]) begin
+        for (int s = 0; s < 4; s++) begin
+          a   = a_vec[i];
+          b   = b_vec[j];
+          sel = s;
+          #1;
+          cov.alu_cov.sample();
+        end
+      end
+    end
+
+    $display("ALU Functional Coverage: %0.2f%%", cov.alu_cov.get_coverage());
+
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("alu.vcd");
+    $dumpvars(0, alu_tb);
+  end
+
+endmodule
