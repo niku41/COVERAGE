@@ -1,0 +1,70 @@
+module bcd_7seg(
+    input [3:0] bcd,
+    output reg [7:0] display
+    );
+    
+    always@* begin
+        case(bcd)
+        0 : display = 7'b1111110;
+            1 : display = 7'b0110000;
+            2 : display = 7'b1101101;
+            3 : display = 7'b1111001;
+            4 : display = 7'b0110011;
+            5 : display = 7'b1011011;
+            6 : display = 7'b1011111;
+            7 : display = 7'b1110000;
+            8 : display = 7'b1111111;
+            9 : display = 7'b1111011;
+            default : display = 7'b000000;
+        endcase
+    end
+    
+endmodule
+
+module bdc_7seg_tb();
+  logic [3:0] bcd;
+  logic [7:0] display;
+  
+  bcd_7seg inst(.bcd(bcd),.display(display));
+  
+  class bcd_display_cov;
+    covergroup bcd_cov;
+      option.per_instance = 1;
+      
+      cp_bcd: coverpoint bcd{
+        bins valid_bins[] = {[0:9]};
+        bins invalid_bins[] = {[10:15]};
+      }
+      
+      output_display: coverpoint display{
+        bins all_patterns[] = {[0:127]};
+      }
+      
+      cross_bcd: cross cp_bcd, output_display;
+      
+    endgroup
+    
+    function new();
+      bcd_cov = new();
+    endfunction
+    
+  endclass
+  
+  bcd_display_cov cov = new();
+  
+  initial begin
+    for(int i = 0; i<16; i++)begin
+      bcd = i;
+      #1;
+      cov.bcd_cov.sample();
+    end
+    $display("Functional coverage: %0.2f%%", cov.bcd_cov.get_coverage());
+    $finish;
+  end
+  
+  initial begin
+    $dumpfile("bcd.vcd");
+    $dumpvars(0,bdc_7seg_tb);
+  end
+  
+endmodule
