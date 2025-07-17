@@ -1,0 +1,137 @@
+module mem8x4(input [2:0] addr,
+    input [3:0] data_in,
+    input wr,
+    output reg [3:0] data_out
+);
+    reg [3:0] mem [0:7]; 
+    always @(*) begin
+        if (wr) 
+            mem[addr] <= data_in;
+        else 
+            data_out <= mem[addr];
+    end
+endmodule
+
+module mem_tb;
+  
+  logic [3:0] data_in;
+  logic wr;
+  logic [2:0] addr;
+  logic [3:0] data_out;
+  
+  class mem_coverage;
+    covergroup mem_cov;
+      option.per_instance = 1;
+      
+      input_data: coverpoint data_in{
+        bins data0 = {4'b0000};
+        bins data1 = {4'b0001};
+        bins data2 = {4'b0010};
+        bins data3 = {4'b0011};
+        bins data4 = {4'b0100};
+        bins data5 = {4'b0101};
+        bins data6 = {4'b0110};
+        bins data7 = {4'b0111};
+        bins data8 = {4'b1000};
+        bins data9 = {4'b1001};
+        bins data21 = {4'b1010};
+        bins data31 = {4'b1011};
+        bins data41 = {4'b1100};
+        bins data51 = {4'b1101};
+        bins data61 = {4'b1110};
+        bins data71 = {4'b1111};
+      }
+      
+      input_wr: coverpoint wr{
+        bins low = {0};
+        bins high = {1};
+      }
+       
+      input_addr: coverpoint data_in{
+        bins addr0 = {3'b000};
+        bins addr1 = {3'b001};
+        bins addr2 = {3'b010};
+        bins addr3 = {3'b011};
+        bins addr4 = {3'b100};
+        bins addr5 = {3'b101};
+        bins addr6 = {3'b110};
+        bins addr7 = {3'b111};
+      }
+      
+      output_dat: coverpoint data_out{
+        bins dat0 = {4'b000};
+        bins dat1 = {4'b001};
+        bins dat2 = {4'b010};
+        bins dat3 = {4'b011};
+        bins dat4 = {4'b100};
+        bins dat5 = {4'b101};
+        bins dat6 = {4'b110};
+        bins dat7 = {4'b111};
+        bins dat8 = {4'b000};
+        bins dat9 = {4'b001};
+        bins dat10 = {4'b010};
+        bins dat11 = {4'b011};
+        bins dat12 = {4'b100};
+        bins dat13 = {4'b101};
+        bins dat14 = {4'b110};
+        bins dat15 = {4'b111};
+      }
+      
+      cross input_data, input_wr, input_addr;
+      
+    endgroup
+    
+    function new();
+      mem_cov = new();
+    endfunction
+    
+  endclass
+  
+  mem_coverage cov = new();
+  
+  integer idx;
+  
+  initial begin
+    $display("Starting memory coverage test...");
+    
+    idx = 0;
+    for (int i = 0; i < 8; i++) begin
+      addr = i;
+      data_in = idx;
+      wr = 1;
+      #2;
+      cov.mem_cov.sample();
+      idx += 2;
+    end
+
+    for (int i = 0; i < 8; i++) begin
+      addr = i;
+      wr = 0;
+      #2;
+      cov.mem_cov.sample();
+     end
+
+    for (int i = 0; i < 16; i++) begin
+      addr = i % 8;
+      data_in = i;
+      wr = 1;
+      #2;
+      cov.mem_cov.sample();
+     end
+
+    for (int i = 0; i < 8; i++) begin
+      addr = i;
+      wr = 0;
+      #2;
+      cov.mem_cov.sample();
+     end
+    $display("Functional coverage: %0.2f%%", cov.mem_cov.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("memory.vcd");
+    $dumpvars(0,mem_tb);
+  end
+
+endmodule
