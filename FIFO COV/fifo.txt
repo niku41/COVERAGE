@@ -1,0 +1,173 @@
+module fifo(input clk,
+            input rst,
+            input r_en,
+            input w_en,
+            input [3:0] d_in,
+            output [3:0] d_out,
+            output empty, full
+           );
+  
+  reg [2:0] mem[0:3];
+  reg [1:0] w_ptr, r_ptr;
+  reg e_reg, f_reg;
+  
+  always@(posedge clk)begin
+    if(rst)
+      w_ptr <= 0;
+    else
+      if(w_en && !f_reg)
+        w_ptr <= w_ptr + 1;
+  end
+  
+  always@(posedge clk or posedge rst)begin
+    if(rst)
+      e_reg <= 1;
+    else if(w_en && !f_reg && (w_ptr != r_ptr))
+      e_reg <= 0;
+    else if(r_en && (w_ptr == r_ptr + 1))
+      e_reg <= 1;
+  end
+  
+  always@(posedge clk)begin
+    if(rst)
+      f_reg <= 0;
+    else if(w_en && w_ptr >= 5'b10000)
+      f_reg <= 1;
+    else if(r_en && !e_reg)
+      f_reg <= 0;
+  end
+  
+  always@(posedge clk or posedge rst)begin
+    if(rst)
+      r_ptr <= 0;
+    else if(r_en && !e_reg)
+      r_ptr <= r_ptr + 1;
+  end
+  
+  always @ (posedge clk )
+    begin
+        if(w_en && !f_reg)
+            mem[w_ptr]<=d_in;
+    end
+  
+ assign d_out = (r_en)?mem[r_ptr-1]:8'bzzzzzzzz;
+ assign empty=e_reg;
+ assign full=f_reg; 
+  
+endmodule
+
+
+module fifo_tb();
+  
+  bit clk;
+  bit rst;
+  bit r_en;
+  bit w_en;
+  logic [3:0] d_in;
+  logic [3:0] d_out;
+  bit empty;
+  bit full;
+  
+  fifo inst(
+    .clk(clk), .rst(rst), .r_en(r_en), .w_en(w_en),
+    .d_in(d_in), .d_out(d_out), .empty(empty), .full(full)
+  );
+
+  always #5 clk = ~clk;
+
+  class fifo_coverage;
+    covergroup fifo_cov;
+      option.per_instance = 1;
+
+      input_clk: coverpoint clk {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_rst: coverpoint rst {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_r_en: coverpoint r_en {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_w_en: coverpoint w_en {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      output_empty: coverpoint empty {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      output_full: coverpoint full {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      output_dout: coverpoint d_out {
+        bins all_val[] = {[0:15]};
+      }
+
+      input_din: coverpoint d_in {
+        bins all_val[] = {[0:15]};
+      }
+
+      cross_input: cross input_clk, input_rst, input_r_en, input_w_en, input_din;
+    endgroup
+
+    function new();
+      fifo_cov = new();
+    endfunction
+  endclass
+
+  fifo_coverage cov;
+
+  initial begin
+    clk = 0;
+    rst = 1;
+    w_en = 0;
+    r_en = 0;
+    d_in = 0;
+    cov = new();
+    #10;
+    rst = 0;
+
+    for (int i = 0; i < 8; i++) begin
+      @(posedge clk);
+      w_en = 1;
+      r_en = 0;
+      d_in = $urandom_range(0, 15);
+      cov.fifo_cov.sample(); 
+    end 
+
+    @(posedge clk);
+    w_en = 0;
+    r_en = 0;
+    cov.fifo_cov.sample();
+
+    for (int i = 0; i < 8; i++) begin
+      @(posedge clk);
+      w_en = 0;
+      r_en = 1;
+      cov.fifo_cov.sample(); 
+    end
+
+    @(posedge clk);
+    r_en = 0;
+    cov.fifo_cov.sample();
+
+    $display("Functional coverage: %0.2f%%", cov.fifo_cov.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("fifo.vcd");
+    $dumpvars(0, fifo_tb);
+  end
+
+endmodule
