@@ -1,0 +1,176 @@
+module universal_shift_reg_16bit(
+    input clk,                   
+    input rst,                   
+    input load,                  
+    input shift_enable,          
+    input [1:0] mode,           
+  input [3:0] data_in,        
+  output reg [3:0] data_out   
+);
+
+    always @(posedge clk) begin
+        if (rst) begin
+            data_out <= 4'b0;
+        end else if (load) begin
+            data_out <= data_in;
+        end else if (shift_enable) begin
+            case (mode)
+              2'b00: data_out <= {data_out[2:0], 1'b0};   
+              2'b01: data_out <= {1'b0, data_out[3:1]};   
+              2'b10: data_out <= {data_out[2:0], data_out[3]}; 
+              2'b11: data_out <= {data_out[0], data_out[3:1]};  
+                default: data_out <= data_out;  
+            endcase
+        end
+    end
+
+endmodule
+
+module tb_shift_reg();
+  
+  bit clk;                  
+  bit rst;                   
+  bit load;                  
+  bit shift_enable;          
+  logic [1:0] mode;           
+  logic [3:0] data_in;        
+  logic [3:0] data_out;
+  
+  universal_shift_reg_16bit inst(.clk(clk),.rst(rst),.load(load),.shift_enable(shift_enable),.mode(mode),.data_in(data_in),.data_out(data_out));
+  
+  always #5 clk = ~clk;
+
+  class reg_coverage;
+    covergroup reg_cov;
+      option.per_instance = 1;
+      
+      input_clk: coverpoint clk{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_rst: coverpoint rst{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_load: coverpoint load{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_shift_en: coverpoint shift_enable{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_mode: coverpoint mode{
+        bins mode1 = {2'b00};
+        bins mode2 = {2'b01};
+        bins mode3 = {2'b10};
+        bins mode4 = {2'b11};
+      }
+      
+      input_din: coverpoint data_in {
+  bins din[] = {[0:15]};
+}
+
+output_dout: coverpoint data_out {
+  bins dout[] = {[0:15]};
+}      
+     /* input_din: coverpoint data_in{
+        bins din1 = {3'b000};
+        bins din2 = {3'b001};
+        bins din3 = {3'b010};
+        bins din4 = {3'b011};
+        bins din5 = {3'b100};
+        bins din6 = {3'b101};
+        bins din7 = {3'b110};
+        bins din8 = {3'b111};
+      }
+      
+      output_dout: coverpoint data_out{
+        bins dout1 = {3'b000};
+        bins dout2 = {3'b001};
+        bins dout3 = {3'b010};
+        bins dout4 = {3'b011};
+        bins dout5 = {3'b100};
+        bins dout6 = {3'b101};
+        bins dout7 = {3'b110};
+        bins dout8 = {3'b111};
+      }*/
+      
+      cross_input: cross input_clk, input_rst, input_load, input_shift_en, input_mode, input_din;
+      
+    endgroup
+    
+    function new();
+      reg_cov = new();
+    endfunction
+    
+  endclass
+  
+  reg_coverage cov;
+  
+  initial begin
+    clk = 0;
+    rst = 1;
+    load = 0;
+    shift_enable = 0;
+    mode = 2'b00;
+    data_in = 0;
+    cov = new();
+    #10;
+    rst = 0;
+    
+    for(int i = 0; i < 16; i++)begin
+      @(posedge clk);
+      load = 1;
+      data_in = $urandom_range(0, 15);
+      cov.reg_cov.sample();
+    end
+    
+    for(int i = 0; i < 16; i++)begin
+      @(posedge clk);
+      shift_enable = 1;
+      mode = $urandom_range(0, 3);
+      data_in = $urandom_range(0, 15);
+      cov.reg_cov.sample();
+    end
+    
+    @(posedge clk);
+    shift_enable = 0;
+    cov.reg_cov.sample();
+
+    @(posedge clk);
+    rst = 1;
+	load = 0;
+	shift_enable = 0;
+	mode = 2'b00;
+	data_in = 4'b1010;
+	cov.reg_cov.sample();
+
+	@(posedge clk);
+	rst = 0;
+    
+    for(int i = 0; i < 20; i++) begin
+  @(posedge clk);
+  rst = $urandom_range(0,1);
+  load = $urandom_range(0,1);
+  shift_enable = $urandom_range(0,1);
+  mode = $urandom_range(0,3);
+  data_in = $urandom_range(0,15);
+
+  cov.reg_cov.sample();
+end
+
+    $display("Functional coverage: %0.2f%%", cov.reg_cov.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("universal_shift_reg_16bit.vcd");
+    $dumpvars(0, tb_shift_reg);
+  end
+  
+endmodule
