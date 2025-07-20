@@ -1,0 +1,106 @@
+module mux4X1(input [3:0]I,input [1:0]sel,output out);
+assign out=I[sel];
+endmodule
+
+module mux2X1(input [1:0]I,input sel,output out);
+assign out=I[sel];
+endmodule
+
+module shift_right(input[3:0]w,input [1:0]shift,output [3:0]y);
+mux4X1 m1({w[2],w[1],w[0],w[3]},shift,y[3]);
+mux4X1 m2({w[1],w[0],w[3],w[2]},shift,y[2]);
+mux4X1 m3({w[0],w[3],w[2],w[1]},shift,y[1]);
+mux4X1 m4({w[3],w[2],w[1],w[0]},shift,y[0]);
+endmodule 
+
+module shift_left (input [3:0] w,input [1:0] shift,output [3:0] y);
+
+mux4X1 m1({w[3], w[2], w[1], w[0]}, shift, y[3]);
+mux4X1 m2({w[2], w[1], w[0], w[3]}, shift, y[2]); 
+mux4X1 m3({w[1], w[0], w[3], w[2]}, shift, y[1]); 
+mux4X1 m4({w[0], w[3], w[2], w[1]}, shift, y[0]); 
+
+endmodule
+
+module barrel_shifter(input [3:0]in,input direction,input [2:0]shift_bit,output [3:0]out);
+wire [3:0]t1,t2;
+
+shift_right m1(in,shift_bit,t1);
+shift_left m2(in,shift_bit,t2);
+
+mux2X1 U1({t1[0],t2[0]},direction,out[0]);
+mux2X1 U2({t1[1],t2[1]},direction,out[1]);
+mux2X1 U3({t1[2],t2[2]},direction,out[2]);
+mux2X1 U4({t1[3],t2[3]},direction,out[3]);
+
+endmodule
+
+
+module barrel_shifter_tb();
+  
+  logic [3:0]in;
+  bit direction;
+  logic [2:0]shift_bit;
+  logic [3:0]out;
+  
+  barrel_shifter inst(.in(in),.direction(direction),.shift_bit(shift_bit),.out(out));
+  
+  class barrel_coverage;
+    covergroup barrel_cov;
+      option.per_instance = 1;
+      
+      input_direction: coverpoint direction{
+        bins low = {0};
+        bins high = {1};
+      }
+      
+      input_shift_bit: coverpoint shift_bit{
+        bins all_vals = {[0:3]};
+      }
+      
+      input_in: coverpoint in{
+        bins all_vals = {[0:15]};
+      }
+      
+      output_out: coverpoint out{
+        bins all_vals = {[0:15]};
+      }
+      
+      cross_input: cross input_direction, input_shift_bit, input_in;
+      
+    endgroup
+    
+    function new();
+      barrel_cov = new();
+    endfunction
+    
+  endclass
+  
+  barrel_coverage cov;
+  
+  initial begin
+    
+    direction = 0;
+      shift_bit = 0;
+      in =0;
+    cov = new();
+    #1;
+    
+    for(int i =0; i < 50; i++)begin
+      direction = $urandom_range(0,1);
+      shift_bit = $urandom_range(0,3);
+      in = $urandom_range(0,15);
+      cov.barrel_cov.sample();
+    end
+    
+    $display("Functional coverage: %0.2f%%", cov.barrel_cov.get_coverage());
+    $finish;
+  end
+  
+  initial begin
+    $display("Dump started");
+    $dumpfile("barrel_shifter.vcd");
+    $dumpvars(0,barrel_shifter_tb);
+  end
+  
+endmodule
