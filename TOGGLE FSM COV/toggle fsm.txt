@@ -1,0 +1,112 @@
+module toggle_fsm(
+  input  logic clk, rst,
+  output logic out,
+  output logic state_out  
+);
+
+  typedef enum logic {S0, S1} state_t;
+  state_t state;
+
+  always_ff @(posedge clk or posedge rst) begin
+    if (rst)
+      state <= S0;
+    else
+      state <= (state == S0) ? S1 : S0;
+  end
+
+  always_comb begin
+    out = (state == S1);
+  end
+
+  // Expose state as 1-bit for testbench
+  assign state_out = (state == S1);
+
+endmodule
+
+
+// ------------------- TESTBENCH -------------------------
+
+module fsm_tb();
+  
+  logic clk, rst;
+  logic out;
+  logic state_out;
+  logic transition;
+
+  toggle_fsm inst(.clk(clk), .rst(rst), .out(out), .state_out(state_out));
+  
+  // Clock generation
+  initial clk = 0;
+  always #5 clk = ~clk;
+
+  // ---------------- COVERAGE CLASS ---------------------
+  class toggle_fsm_cov;
+    covergroup fsm_cov @(posedge clk);
+      option.per_instance = 1;
+      
+      input_rst: coverpoint rst {
+        bins low  = {0};
+        bins high = {1};
+      }
+      
+      input_state: coverpoint state_out {
+        bins s0 = {0};
+        bins s1 = {1};
+      }
+      
+      output_out: coverpoint out {
+        bins low  = {0};
+        bins high = {1};
+      }
+
+      tr_transition: coverpoint transition {
+        bins s0_to_s1 = {1};
+        bins s1_to_s0 = {0};
+      }
+
+      cross_cross: cross input_rst, input_state;
+
+    endgroup
+
+    function new();
+      fsm_cov = new();
+    endfunction
+
+    function void sample_transition(bit from, bit to);
+      case ({from, to})
+        2'b01: transition = 1; // S0 to S1
+        2'b10: transition = 0; // S1 to S0
+        default: transition = transition;
+      endcase
+    endfunction
+  endclass
+
+  toggle_fsm_cov cov = new();
+  bit prev_state;
+
+  // ---------------- SIMULATION CONTROL -----------------
+  initial begin
+    cov = new();
+    prev_state = 0;
+
+    rst = 1; @(posedge clk);
+    rst = 0;
+
+    repeat (20) begin
+      @(posedge clk);
+      cov.sample_transition(prev_state, state_out);
+      prev_state = state_out;
+    end
+
+    $display("Coverage = %0.2f%%", cov.fsm_cov.get_coverage());
+    $finish;
+  end
+
+  // ------------------- WAVEDUMP ------------------------
+  initial begin
+    $display("Dump started");
+    $dumpfile("toggle_fsm.vcd");
+    $dumpvars(0, fsm_tb);
+  end
+
+endmodule
