@@ -1,0 +1,121 @@
+module seq_detect_1011(
+  input  logic clk,
+  input  logic rst,
+  input  logic in,
+  output logic detected
+);
+
+  typedef enum logic [2:0] {IDLE, S1, S10, S101, S1011} state_t;
+  state_t state, next_state;
+
+  always_comb begin
+    case (state)
+      IDLE:   next_state = in ? S1    : IDLE;
+      S1:     next_state = in ? S1    : S10;
+      S10:    next_state = in ? S101  : IDLE;
+      S101:   next_state = in ? S1011 : S10;
+      S1011:  next_state = in ? S1    : S10;
+      default:next_state = IDLE;
+    endcase
+  end
+
+  always_ff @(posedge clk or posedge rst) begin
+    if (rst)
+      state <= IDLE;
+    else
+      state <= next_state;
+  end
+
+  always_comb begin
+    detected = (state == S1011);
+  end
+
+endmodule
+
+
+module tb_seq_set_1011();
+
+  logic clk;
+  logic rst;
+  logic in;
+  logic detected;
+  logic [3:0] transition;
+
+  seq_detect_1011 inst(.clk(clk), .rst(rst), .in(in), .detected(detected));
+
+  initial clk = 0;
+  always #5 clk = ~clk;
+
+  class fsm_1011_cov;
+    covergroup f_1011_cov @(posedge clk);
+      option.per_instance = 1;
+
+      input_rst: coverpoint rst {
+        bins low  = {0};
+        bins high = {1};
+      }
+
+      input_in: coverpoint in {
+        bins s0 = {0};
+        bins s1 = {1};
+      }
+
+      output_detected: coverpoint detected {
+        bins low  = {0};
+        bins high = {1};
+      }
+
+      tr_transition: coverpoint transition {
+        bins s1_to_s10       = {4'b0001};
+        bins s101_to_IDLE    = {4'b0101};
+        bins s1011_to_s10    = {4'b1010};
+        bins s1_to_IDLE      = {4'b1110};
+      }
+
+      cross_cross: cross input_rst, input_in;
+    endgroup
+
+    function new();
+      f_1011_cov = new();
+    endfunction
+
+    function void sample_transition(logic [1:0] from, logic [1:0] to);
+      case ({from, to})
+        {2'b00, 2'b01}: transition = 4'b0001; 
+        {2'b01, 2'b10}: transition = 4'b0101; 
+        {2'b10, 2'b11}: transition = 4'b1010; 
+        {2'b11, 2'b00}: transition = 4'b1110; 
+        default: transition = transition;
+      endcase
+    endfunction
+  endclass
+
+  fsm_1011_cov cov = new();
+  logic [1:0] prev_state;
+
+  initial begin
+    cov = new();
+    prev_state = 2'b00;
+
+    rst = 1; @(posedge clk);
+    rst = 0;
+
+    // Generate random inputs
+    repeat (20) begin
+      @(posedge clk);
+      in = $urandom_range(0,1);
+      cov.sample_transition(prev_state, in);
+      prev_state = in;
+    end
+
+    $display("Coverage = %0.2f%%", cov.f_1011_cov.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $display("Dump started");
+    $dumpfile("seq_detect_1011.vcd");
+    $dumpvars(0, tb_seq_set_1011);
+  end
+
+endmodule
