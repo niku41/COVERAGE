@@ -1,0 +1,110 @@
+module pwm( 
+  input clk, rst,
+  output reg dout
+);
+
+  parameter period = 10;
+  integer count;
+  integer ton;
+  reg ncyc;
+
+  always@(posedge clk)begin
+    if(rst)begin
+      count <= 0;
+      ton <= 0;
+      ncyc <= 1'b0;
+    end
+    else begin
+      if(count <= ton)begin
+        count <= count + 1;
+        dout <= 1'b1;
+        ncyc <= 1'b0;
+      end
+      else if(count < period)begin
+        count <= count + 1;
+        dout <= 1'b0;
+        ncyc <= 1'b0;
+      end
+      else begin
+        ncyc <= 1'b1;
+        count <= 0;
+      end
+    end
+  end
+
+  always@(posedge clk)begin
+    if(rst == 1'b0)begin
+      if(ncyc == 1'b1)begin
+        if(ton < period) ton <= ton+1;
+        else 
+          ton <= 0;
+      end
+    end
+  end
+
+endmodule
+
+///////tb///////
+module tb_pwm();
+  bit clk, rst;
+  bit dout;
+
+  pwm inst(.clk(clk),.rst(rst),.dout(dout));
+
+  always #5 clk = ~clk;
+
+  class pwm_coverage;
+    covergroup pwm_cov;
+      option.per_instance = 1;
+
+      input_clk : coverpoint clk{
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_rst : coverpoint rst{
+        bins low = {0};
+        bins high = {1};
+      }
+
+      output_dout : coverpoint dout{
+        bins low = {0};
+        bins high = {1};
+      }
+
+      cross_input: cross input_clk, input_rst;
+
+    endgroup
+
+    function new();
+      pwm_cov = new();
+    endfunction
+
+  endclass
+
+  pwm_coverage cov;
+
+  initial begin
+    clk = 0;
+    rst = 0;
+    #50;
+    rst = 1;
+    cov = new();
+    #10;
+    rst = 0;
+
+    for(int i = 0; i < 20; i++) begin
+      @(posedge clk);
+      rst = $urandom_range(0,1);
+      cov.pwm_cov.sample();
+    end
+    $display("Functional coverage: %0.2f%%", cov.pwm_cov.get_coverage());
+    $finish;
+  end
+
+  initial begin
+    $dumpfile("pwm.vcd");
+    $dumpvars(0, tb_pwm);
+  end
+  
+endmodule
