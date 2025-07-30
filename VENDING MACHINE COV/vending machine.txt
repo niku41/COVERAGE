@@ -1,0 +1,221 @@
+module vend(coin, clock, reset, newspaper);
+
+  input [1:0] coin;
+  input clock;
+  input reset;
+  output newspaper;
+
+  wire [1:0] NEXT_STATE; 
+  reg [1:0] PRES_STATE;
+    
+  parameter s0 = 2'b00,
+  s5 = 2'b01,
+  s10 = 2'b10,
+  s15 = 2'b11;
+  
+  function [2:0] fsm;
+    input [1:0] fsm_coin; 
+    input [1:0] fsm_PRES_STATE;
+    reg fsm_newspaper; 
+    reg [1:0] fsm_NEXT_STATE;
+    
+    begin
+      case (fsm_PRES_STATE)
+
+        s0: //state = s0
+            begin
+                if (fsm_coin == 2'b10)
+                begin
+                    fsm_newspaper = 1'b0; 
+                    fsm_NEXT_STATE = s10;
+                end
+        
+                else if (fsm_coin == 2'b01)
+                begin
+                    fsm_newspaper = 1'b0; 
+                    fsm_NEXT_STATE = s5;
+                end
+        
+                else 
+                begin
+                    fsm_newspaper = 1'b0; 
+                    fsm_NEXT_STATE = s0;
+                end
+            end
+        
+        s5: //state = s5
+            begin
+                if (fsm_coin == 2'b10)
+                begin
+                    fsm_newspaper = 1'b0 ;
+                    fsm_NEXT_STATE = s15 ;
+                end
+        
+                else if (fsm_coin == 2'b01) 
+                begin
+                    fsm_newspaper = 1'b0; 
+                    fsm_NEXT_STATE = s10;
+                end
+        
+                else
+                begin
+                    fsm_newspaper = 1'b0 ;
+                    fsm_NEXT_STATE = s5;
+                end
+            end
+        
+        s10:  //state = s10
+            begin
+                if (fsm_coin == 2'b10)
+                begin
+                    fsm_newspaper = 1'b0 ;
+                    fsm_NEXT_STATE =s15 ;
+                end
+        
+                else if (fsm_coin == 2'b01 )
+                begin
+                    fsm_newspaper = 1'b0;
+                    fsm_NEXT_STATE = s15 ;
+                end 
+        
+                else
+                begin
+                    fsm_newspaper = 1'b0 ; 
+                    fsm_NEXT_STATE = s10;
+                end
+            end
+        
+        s15: //state = s 15
+            begin 
+                fsm_newspaper = 1'b1 ;
+                fsm_NEXT_STATE = s0 ;
+            end
+        
+        endcase
+    
+        fsm= {fsm_newspaper, fsm_NEXT_STATE};
+    end
+endfunction
+  
+  assign {newspaper, NEXT_STATE}= fsm(coin, PRES_STATE);
+
+  always @(posedge clock)
+    begin
+      if (reset == 1'b1)
+        PRES_STATE = s0 ;
+      else
+        PRES_STATE = NEXT_STATE;
+    end
+
+endmodule
+
+module tb_vend();
+
+  logic [1:0] coin;
+  bit clock;
+  bit reset;
+  bit newspaper; 
+  logic [3:0] transition;
+
+  // DUT instance
+  vend inst(.coin(coin), .clock(clock), .reset(reset), .newspaper(newspaper));
+
+  // Clock generation
+  initial clock = 0;
+  always #5 clock = ~clock;
+
+  // Coverage class
+  class vend_coverage;
+    covergroup vend_cov;
+      option.per_instance = 1;
+
+      input_clock: coverpoint clock {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_reset: coverpoint reset {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      input_coin: coverpoint coin {
+        bins coin0 = {2'b00};
+        bins coin1 = {2'b01};
+        bins coin2 = {2'b10};
+        bins coin3 = {2'b11};
+      }
+
+      output_newspaper: coverpoint newspaper {
+        bins low = {0};
+        bins high = {1};
+      }
+
+      cross_input: cross input_clock, input_reset;
+
+      tr_transition: coverpoint transition {
+        bins s0_to_s10 = {4'b0010};
+        bins s0_to_s5  = {4'b0001};
+        bins s0_to_s0  = {4'b0000};
+        bins s5_to_s15 = {4'b0111};
+        bins s5_to_s10 = {4'b0110};
+        bins s5_to_s5  = {4'b0101};
+        bins s10_to_s15 = {4'b1011};
+        bins s10_to_s10 = {4'b1010};
+        bins s15_to_s0  = {4'b1100};
+      }
+    endgroup
+
+    function new();
+      vend_cov = new();
+    endfunction
+
+    function void sample_transition(logic [1:0] from, logic [1:0] to);
+      case({from, to})
+        {2'b00, 2'b10}: transition = 4'b0010; 
+        {2'b00, 2'b01}: transition = 4'b0001; 
+        {2'b00, 2'b00}: transition = 4'b0000; 
+        {2'b01, 2'b11}: transition = 4'b0111; 
+        {2'b01, 2'b10}: transition = 4'b0110; 
+        {2'b01, 2'b01}: transition = 4'b0101; 
+        {2'b10, 2'b11}: transition = 4'b1011; 
+        {2'b10, 2'b10}: transition = 4'b1010; 
+        {2'b11, 2'b00}: transition = 4'b1100; 
+        default: transition = 4'b1111; // invalid
+      endcase
+    endfunction
+  endclass
+
+  // Create object
+  vend_coverage cov = new();
+  logic [1:0] prev_state;
+
+  // Stimulus
+  initial begin
+    cov = new();
+    coin = 2'b00;
+    prev_state = 2'b00;
+    reset = 1; @(posedge clock);
+    reset = 0;
+
+    repeat (200) begin
+      @(posedge clock);
+      prev_state = inst.PRES_STATE;
+      coin = $urandom_range(0, 3);
+      @(posedge clock);
+      cov.sample_transition(prev_state, inst.PRES_STATE);
+      cov.vend_cov.sample();
+    end
+
+    $display("Coverage: %0.2f%%", cov.vend_cov.get_coverage());
+    $finish;
+  end
+
+  // VCD dump
+  initial begin
+    $display("Dump started");
+    $dumpfile("vend.vcd");
+    $dumpvars(0, tb_vend);
+  end
+
+endmodule
