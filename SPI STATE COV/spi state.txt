@@ -1,0 +1,120 @@
+module spi_state(
+    input  wire        clk,
+    input  wire        reset,
+    input  wire [15:0] datain,
+    output wire        spi_cs_l,
+    output wire        spi_sclk,
+    output wire        spi_data,
+    output wire [4:0]  counter,
+    output wire [1:0]  state  // <<< ADD THIS for TB access
+);
+
+    reg [15:0] MOSI;
+    reg [4:0] count;
+    reg cs_l;
+    reg sclk;
+    reg [1:0] state_r;
+
+    assign state = state_r;
+
+    always @(posedge clk or posedge reset) begin
+        if (reset) begin
+            MOSI   <= 16'd0;
+            count  <= 5'd16;
+            cs_l   <= 1'b1;
+            sclk   <= 1'b0;
+            state_r <= 2'd0;
+        end else begin
+            case (state_r)
+                2'd0: begin
+                    sclk   <= 1'b0;
+                    cs_l   <= 1'b1;
+                    state_r <= 2'd1;
+                end
+                2'd1: begin
+                    sclk   <= 1'b0;
+                    cs_l   <= 1'b0;
+                    MOSI   <= datain[count - 1];
+                    count  <= count - 1;
+                    state_r <= 2'd2;
+                end
+                2'd2: begin
+                    sclk <= 1'b1;
+                    if (count > 0)
+                        state_r <= 2'd1;
+                    else begin
+                        count  <= 5'd16;
+                        state_r <= 2'd0;
+                    end
+                end
+                default: state_r <= 2'd0;
+            endcase
+        end
+    end
+
+    assign spi_cs_l = cs_l;
+    assign spi_sclk = sclk;
+    assign spi_data = MOSI;
+    assign counter  = count;
+
+endmodule
+
+
+module tb_spi_state;
+
+  logic clk, reset;
+  logic [15:0] datain;
+  wire spi_cs_l, spi_sclk, spi_data;
+  wire [4:0] counter;
+  wire [1:0] state;
+
+  spi_state dut(.clk(clk), .reset(reset), .datain(datain),
+                .spi_cs_l(spi_cs_l), .spi_sclk(spi_sclk), .spi_data(spi_data),
+                .counter(counter), .state(state));
+
+  always #5 clk = ~clk;
+
+  class spi_state_coverage;
+    covergroup cg;
+      input_reset : coverpoint reset;
+      input_state : coverpoint state {
+        bins s0 = {2'd0};
+        bins s1 = {2'd1};
+        bins s2 = {2'd2};
+      }
+      output_spi_cs_l : coverpoint spi_cs_l;
+      output_spi_sclk : coverpoint spi_sclk;
+      output_spi_data : coverpoint spi_data;
+    endgroup
+
+    function new();
+      cg = new();
+    endfunction
+  endclass
+
+  spi_state_coverage cov;
+
+  initial begin
+    $dumpfile("spi_state.vcd");
+    $dumpvars(0, tb_spi_state);
+  end
+
+  initial begin
+    clk = 0;
+    cov = new();
+
+    reset = 1; datain = 16'h0000;
+    repeat(2) @(posedge clk);
+    reset = 0;
+
+    for (int i = 0; i < 20; i++) begin
+  datain = $urandom_range(0, 65535);
+  repeat(60) @(posedge clk);
+  cov.cg.sample();
+end
+
+    $display("COVERAGE = %0.2f%%", cov.cg.get_coverage());
+    $finish;
+  end
+
+endmodule
